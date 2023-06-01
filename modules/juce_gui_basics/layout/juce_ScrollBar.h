@@ -90,6 +90,9 @@ public:
     */
     bool autoHides() const noexcept;
 
+    /** Returns true if this scrollbard is in the process of being dragged */
+    bool getIsDraggingThumb() const noexcept;
+
     //==============================================================================
     /** Sets the minimum and maximum values that the bar will move between.
 
@@ -318,6 +321,11 @@ public:
         */
         virtual void scrollBarMoved (ScrollBar* scrollBarThatHasMoved,
                                      double newRangeStart) = 0;
+
+        /** Called when a Scrollbar has finished dragging.
+            @param scrollBar         the bar that has finished
+        */
+        virtual void scrollBarFinishedDragging(ScrollBar* scrollBar);
     };
 
     /** Registers a listener that will be called when the scrollbar is moved. */
@@ -426,6 +434,11 @@ private:
     class ScrollbarButton;
     std::unique_ptr<ScrollbarButton> upButton, downButton;
     ListenerList<Listener> listeners;
+    enum Notifications : char {
+      noNotifications =      0,
+      movedNotification =    1 << 0,
+      finishedNotification = 1 << 1
+    } notificationsToSend = noNotifications;
 
     std::unique_ptr<AccessibilityHandler> createAccessibilityHandler() override;
     void handleAsyncUpdate() override;

@@ -97,8 +97,11 @@ bool ScrollBar::setCurrentRange (Range<double> newRange, NotificationType notifi
 
         updateThumbPosition();
 
-        if (notification != dontSendNotification)
-            triggerAsyncUpdate();
+        if (notification != dontSendNotification) {
+          notificationsToSend = 
+            Notifications(notificationsToSend | movedNotification);
+          triggerAsyncUpdate();
+        }
 
         if (notification == sendNotificationSync)
             handleUpdateNowIfNeeded();
@@ -160,6 +163,10 @@ void ScrollBar::setButtonRepeatSpeed (int newInitialDelay,
 }
 
 //==============================================================================
+void ScrollBar::Listener::scrollBarFinishedDragging([[maybe_unused]] ScrollBar* scrollBar)
+{
+}
+
 void ScrollBar::addListener (Listener* listener)
 {
     listeners.add (listener);
@@ -172,8 +179,16 @@ void ScrollBar::removeListener (Listener* listener)
 
 void ScrollBar::handleAsyncUpdate()
 {
-    auto start = visibleRange.getStart(); // (need to use a temp variable for VC7 compatibility)
-    listeners.call ([this, start] (Listener& l) { l.scrollBarMoved (this, start); });
+    if (notificationsToSend & movedNotification) {
+      auto start = visibleRange.getStart(); // (need to use a temp variable for VC7 compatibility)
+      listeners.call([this, start](Listener& l) { l.scrollBarMoved(this, start); });
+    }
+
+    if (notificationsToSend & finishedNotification) {
+      listeners.call([this](Listener& l) { l.scrollBarFinishedDragging(this); });
+    }
+
+    notificationsToSend = noNotifications;
 }
 
 //==============================================================================
@@ -238,6 +253,11 @@ void ScrollBar::setAutoHide (bool shouldHideWhenFullRange)
 bool ScrollBar::autoHides() const noexcept
 {
     return autohides;
+}
+
+bool ScrollBar::getIsDraggingThumb() const noexcept
+{
+  return isDraggingThumb;
 }
 
 //==============================================================================
@@ -373,6 +393,12 @@ void ScrollBar::mouseDrag (const MouseEvent& e)
 
 void ScrollBar::mouseUp (const MouseEvent&)
 {
+    if (isDraggingThumb) {
+      notificationsToSend =
+        Notifications(notificationsToSend | finishedNotification);
+      triggerAsyncUpdate();
+    }
+
     isDraggingThumb = false;
     stopTimer();
     repaint();
